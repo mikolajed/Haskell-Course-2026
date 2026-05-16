@@ -1,0 +1,18 @@
+-- |
+-- Module      : ZKAlgebra
+-- Description : Re-exports the public API of the zk-algebra library
+--
+-- Import this module for convenient access to all ZKAlgebra components:
+--
+-- @
+-- import ZKAlgebra
+-- @
+
+module ZKAlgebra
+  ( module ZKAlgebra.Algebra,
+    module ZKAlgebra.Field,
+  )
+where
+
+import ZKAlgebra.Algebra
+import ZKAlgebra.Field
