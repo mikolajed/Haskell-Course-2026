@@ -29,4 +29,14 @@ main = do
   putStrLn $ "x + y = " ++ show (x + y)
   putStrLn $ "x * y = " ++ show (x * y)
 
+  -- Example 3: polynomials over F_97
+  let p = poly [3, 1, 0, 1] :: Poly (Fp 97)
+  let q = poly [1, 1] :: Poly (Fp 97)
+
+  putStrLn $ "\nPolynomial over F_97:"
+  putStrLn $ "p(x) = " ++ show p
+  putStrLn $ "q(x) = " ++ show q
+  putStrLn $ "p(5) = " ++ show (polyEval p 5)
+  putStrLn $ "p(x) * q(x) = " ++ show (p * q)
+
   putStrLn "\nTry changing Main.hs to experiment with other primes!"

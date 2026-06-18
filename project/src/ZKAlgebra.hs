@@ -11,8 +11,10 @@
 module ZKAlgebra
   ( module ZKAlgebra.Algebra,
     module ZKAlgebra.Field,
+    module ZKAlgebra.Polynomial,
   )
 where
 
 import ZKAlgebra.Algebra
 import ZKAlgebra.Field
+import ZKAlgebra.Polynomial

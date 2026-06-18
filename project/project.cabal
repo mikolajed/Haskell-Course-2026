@@ -8,6 +8,7 @@ library
   exposed-modules:     ZKAlgebra
                      , ZKAlgebra.Algebra
                      , ZKAlgebra.Field
+                     , ZKAlgebra.Polynomial
   build-depends:       base >= 4.7 && < 5
   default-language:    Haskell2010
 
@@ -23,6 +24,7 @@ test-suite zk-algebra-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Test.Field
+                     , Test.Polynomial
   build-depends:       base >= 4.7 && < 5
                      , project
                      , tasty
