@@ -38,5 +38,6 @@ main = do
   putStrLn $ "q(x) = " ++ show q
   putStrLn $ "p(5) = " ++ show (polyEval p 5)
   putStrLn $ "p(x) * q(x) = " ++ show (p * q)
+  putStrLn $ "polyMulNTT p q = " ++ show (polyMulNTT p q)
 
   putStrLn "\nTry changing Main.hs to experiment with other primes!"
