@@ -8,9 +8,11 @@ library
   exposed-modules:     ZKAlgebra
                      , ZKAlgebra.Algebra
                      , ZKAlgebra.Field
+                     , ZKAlgebra.Multilinear
                      , ZKAlgebra.NTT
                      , ZKAlgebra.Polynomial
   build-depends:       base >= 4.7 && < 5
+                     , vector
   default-language:    Haskell2010
 
 executable zk-algebra-demo
@@ -25,6 +27,7 @@ test-suite zk-algebra-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Test.Field
+                     , Test.Multilinear
                      , Test.NTT
                      , Test.Polynomial
   build-depends:       base >= 4.7 && < 5
@@ -33,4 +36,5 @@ test-suite zk-algebra-test
                      , tasty-quickcheck
                      , tasty-hunit
                      , QuickCheck
+                     , vector
   default-language:    Haskell2010

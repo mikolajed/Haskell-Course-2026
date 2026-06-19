@@ -40,4 +40,13 @@ main = do
   putStrLn $ "p(x) * q(x) = " ++ show (p * q)
   putStrLn $ "polyMulNTT p q = " ++ show (polyMulNTT p q)
 
+  -- Example 4: multilinear polynomial over F_97
+  let f = mlp 2 [10, 20, 30, 40] :: MultilinearPoly (Fp 97)
+
+  putStrLn $ "\nMultilinear polynomial over F_97:"
+  putStrLn $ "f evaluations = " ++ show (mlpEvals f)
+  putStrLn $ "sum over {0,1}^2 = " ++ show (mleSum f)
+  putStrLn $ "f~(2,3) = " ++ show (mleEval f [2, 3])
+  putStrLn $ "partial sum over x2 = " ++ show (mlePartialSum f)
+
   putStrLn "\nTry changing Main.hs to experiment with other primes!"
