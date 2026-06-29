@@ -94,21 +94,23 @@ main = do
 
   -- Example 8: MiMC Algebraic Hash
   putStrLn ""
-  putStrLn "=== MiMC-5 Algebraic Hash Function ==="
+  putStrLn "=== MiMC Algebraic Hash Function ==="
   putStrLn ""
-  putStrLn "  MiMC is a ZK-friendly hash function operating directly on field elements."
-  putStrLn "  Hashing takes 110 rounds of x -> (x + k + c)^5."
+  let mimcD = mimcExponent 251
+  putStrLn $ "  MiMC is a ZK-friendly hash function operating directly on field elements."
+  putStrLn $ "  For F_251, the dynamically chosen exponent is d = " ++ show mimcD
+  putStrLn $ "  Hashing takes 110 rounds of x -> (x + k + c)^" ++ show mimcD ++ "."
   
   let secretValue = 123 :: Fp 251
   let mimcOutput = mimcHash secretValue
   putStrLn $ "  Input (secret): " ++ show secretValue
-  putStrLn $ "  MiMC-5 Hash   : " ++ show mimcOutput
+  putStrLn $ "  MiMC Hash     : " ++ show mimcOutput
   
   putStrLn "  ┌─────────────────────────────────────────────────┐"
   putStrLn "  │  Why use MiMC instead of SHA-256?               │"
   putStrLn "  │  Proving this hash in a ZK-SNARK requires:      │"
   putStrLn "  │    - SHA-256: ~30,000 polynomial constraints    │"
-  putStrLn "  │    - MiMC-5 : ~330 polynomial constraints       │"
+  putStrLn $ "  │    - MiMC-" ++ show mimcD ++ " : ~330 polynomial constraints       │"
   putStrLn "  └─────────────────────────────────────────────────┘"
 
   -- Example 9: Inner Product Proof (proving something useful!)

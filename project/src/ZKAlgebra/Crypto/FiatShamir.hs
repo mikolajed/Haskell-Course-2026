@@ -10,7 +10,7 @@
 -- Turns the interactive sumcheck protocol into a non-interactive one by
 -- deriving verifier challenges from a hash of the transcript so far.
 --
--- This module uses the ZK-friendly MiMC-5 algebraic hash function, allowing
+-- This module uses the ZK-friendly MiMC algebraic hash function, allowing
 -- the transcript to operate entirely on field elements without any bitwise
 -- serialization.
 module ZKAlgebra.Crypto.FiatShamir
