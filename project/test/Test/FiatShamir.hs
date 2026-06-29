@@ -13,6 +13,7 @@ import ZKAlgebra.Multilinear
 import ZKAlgebra.Polynomial
 import ZKAlgebra.Crypto.Sumcheck
 import ZKAlgebra.Crypto.FiatShamir
+import qualified Data.Vector as V
 
 type F = Fp 97
 
@@ -29,6 +30,7 @@ fiatShamirTests =
     [ determinismTests,
       completenessTests,
       soundnessTests,
+      innerProductFSTests,
       unitTests
     ]
 
@@ -105,4 +107,26 @@ unitTests =
       testCase "encoding round-trip: encodeFp produces non-empty ByteString" $
         let x = 42 :: F
          in assertBool "encodeFp should not be empty" (not (null (show (encodeFp x))))
+    ]
+
+innerProductFSTests :: TestTree
+innerProductFSTests =
+  testGroup
+    "Inner product (Fiat-Shamir)"
+    [ testProperty "FS inner product completeness" $
+        forAll (chooseInt (1, 4)) $ \numVars ->
+          forAll (genMLP numVars) $ \a ->
+            forAll (genMLP numVars) $ \b ->
+              let innerProd = sum [ (mlpEvals a V.! i) * (mlpEvals b V.! i)
+                                 | i <- [0 .. 2^numVars - 1] ]
+                  proof = sumcheckProveFSProduct @97 a b
+                  oracle pt = mleEval a pt * mleEval b pt
+               in sumcheckVerifyFS @97 numVars innerProd oracle proof === Accept,
+      testCase "FS inner product of [1,2,3,4] . [5,6,7,8] = 70" $
+        let a = mlp 2 [1, 2, 3, 4] :: MultilinearPoly F
+            b = mlp 2 [5, 6, 7, 8] :: MultilinearPoly F
+            claim = 70 :: F
+            proof = sumcheckProveFSProduct @97 a b
+            oracle pt = mleEval a pt * mleEval b pt
+         in sumcheckVerifyFS @97 2 claim oracle proof @?= Accept
     ]

@@ -28,6 +28,7 @@ module ZKAlgebra.Crypto.FiatShamir
 
     -- * Non-interactive sumcheck
     sumcheckProveFS,
+    sumcheckProveFSProduct,
     sumcheckVerifyFS,
   )
 where
@@ -106,16 +107,36 @@ encodePoly p =
 -- | Non-interactive sumcheck prover using the Fiat-Shamir heuristic.
 --
 -- Drives the coroutine-based 'sumcheckProver' by deriving each challenge
--- from the transcript. The claimed sum is appended to the transcript before
--- the first round so that the verifier can reproduce the same sequence.
+-- from the transcript.
 sumcheckProveFS ::
   forall p.
   (KnownNat p) =>
   MultilinearPoly (Fp p) ->
   Fp p ->
   SumcheckProof (Fp p)
-sumcheckProveFS poly claimedSum =
-  evalState (go (sumcheckProver poly) []) emptyTranscript
+sumcheckProveFS poly _claimedSum =
+  driveProverFS @p (sumcheckProver poly)
+
+-- | Non-interactive sumcheck prover for the product of two MLEs.
+--
+-- Proves that @\sum_{x \in \{0,1\}^n} a(x) \cdot b(x) = H@ without interaction.
+sumcheckProveFSProduct ::
+  forall p.
+  (KnownNat p) =>
+  MultilinearPoly (Fp p) ->
+  MultilinearPoly (Fp p) ->
+  SumcheckProof (Fp p)
+sumcheckProveFSProduct a b =
+  driveProverFS @p (sumcheckProverProduct a b)
+
+-- | Internal helper: drive any 'ProverState' to completion using Fiat-Shamir.
+driveProverFS ::
+  forall p.
+  (KnownNat p) =>
+  ProverState (Fp p) ->
+  SumcheckProof (Fp p)
+driveProverFS prover =
+  evalState (go prover []) emptyTranscript
   where
     go :: ProverState (Fp p) -> [RoundMessage (Fp p)] -> State Transcript (SumcheckProof (Fp p))
     go (ProverDone v) acc = return $ SumcheckProof (reverse acc) v

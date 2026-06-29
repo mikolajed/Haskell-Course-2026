@@ -13,6 +13,7 @@ module ZKAlgebra.Crypto.Sumcheck
     -- * Interactive prover (coroutine)
     ProverState (..),
     sumcheckProver,
+    sumcheckProverProduct,
     runProver,
 
     -- * Batch prover (all challenges upfront)
@@ -85,6 +86,23 @@ sumcheckProver p
       let g_i = mlePartialSum p
        in ProverRound (RoundMessage g_i) $ \r ->
             sumcheckProver (mleFix p r)
+
+-- | Create an interactive prover for the product of two multilinear polynomials.
+--
+-- Used for inner-product proofs: given @a@ and @b@, proves that
+-- @\sum_{x \in \{0,1\}^n} a(x) \cdot b(x) = H@.
+--
+-- Each round computes a degree-2 partial-sum polynomial from the product
+-- of @a@ and @b@, then waits for a challenge before fixing the first
+-- variable in both polynomials.
+sumcheckProverProduct ::
+  (Field f) => MultilinearPoly f -> MultilinearPoly f -> ProverState f
+sumcheckProverProduct a b
+  | mlpNumVars a == 0 = ProverDone (mleEval a [] * mleEval b [])
+  | otherwise =
+      let g_i = mlePartialSumProduct a b
+       in ProverRound (RoundMessage g_i) $ \r ->
+            sumcheckProverProduct (mleFix a r) (mleFix b r)
 
 -- | Drive an interactive prover to completion with a list of challenges,
 -- collecting the transcript into a 'SumcheckProof'.

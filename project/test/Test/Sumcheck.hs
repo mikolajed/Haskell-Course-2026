@@ -30,6 +30,7 @@ sumcheckTests =
     [ completenessTests,
       soundnessTests,
       coroutineTests,
+      productTests,
       unitTests
     ]
 
@@ -116,3 +117,36 @@ unitTests =
                 Reject err -> return () -- expected
                 Accept     -> assertFailure "Should have rejected wrong claim"
     ]
+
+productTests :: TestTree
+productTests =
+  testGroup
+    "Inner product (product prover)"
+    [ testProperty "product prover completeness" $
+        forAll (chooseInt (1, 4)) $ \numVars ->
+          forAll (genMLP numVars) $ \a ->
+            forAll (genMLP numVars) $ \b ->
+              forAll (genChallenges numVars) $ \challenges ->
+                let -- The true inner product: sum of a(x)*b(x) over {0,1}^n
+                    innerProd = sum [ mleEval a (boolVec numVars i) * mleEval b (boolVec numVars i)
+                                   | i <- [0 .. 2^numVars - 1] ]
+                    proof = runProver (sumcheckProverProduct a b) challenges
+                    oracle pt = mleEval a pt * mleEval b pt
+                 in sumcheckVerify numVars innerProd oracle challenges proof === Accept,
+      testCase "inner product of [1,2,3,4] . [5,6,7,8] = 70" $
+        let a = mlp 2 [1, 2, 3, 4] :: MultilinearPoly F
+            b = mlp 2 [5, 6, 7, 8] :: MultilinearPoly F
+            -- 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
+            claim = 70 :: F
+            challenges = [2, 3] :: [F]
+            proof = runProver (sumcheckProverProduct a b) challenges
+            oracle pt = mleEval a pt * mleEval b pt
+         in sumcheckVerify 2 claim oracle challenges proof @?= Accept
+    ]
+
+-- | Convert an index to a boolean vector in the field.
+boolVec :: (Field f) => Int -> Int -> [f]
+boolVec numVars idx =
+  [ if (idx `div` (2 ^ j)) `mod` 2 == 1 then 1 else 0
+  | j <- [0 .. numVars - 1]
+  ]

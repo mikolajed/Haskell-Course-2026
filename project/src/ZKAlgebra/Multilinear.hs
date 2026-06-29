@@ -25,6 +25,7 @@ module ZKAlgebra.Multilinear
     -- * Sums
     mleSum,
     mlePartialSum,
+    mlePartialSumProduct,
   )
 where
 
@@ -107,6 +108,41 @@ mlePartialSum (MLP numVars evals)
   where
     g0 = sumFirstBit 0 evals
     g1 = sumFirstBit 1 evals
+
+-- | Partial sum of the product of two multilinear polynomials.
+--
+-- Given @a@ and @b@ (both @n@-variate), computes:
+--
+-- @
+--   g(X) = Σ_{x₂,...,xₙ ∈ {0,1}} a(X, x₂, …, xₙ) · b(X, x₂, …, xₙ)
+-- @
+--
+-- Since @a@ and @b@ are each linear in @X@, their product is quadratic,
+-- so @g@ has degree at most 2. We evaluate at three points and interpolate.
+mlePartialSumProduct ::
+  (Field f) => MultilinearPoly f -> MultilinearPoly f -> Poly f
+mlePartialSumProduct (MLP numVarsA evalsA) (MLP numVarsB evalsB)
+  | numVarsA <= 0 || numVarsB <= 0 =
+      error "ZKAlgebra.Multilinear.mlePartialSumProduct: needs at least one variable"
+  | numVarsA /= numVarsB =
+      error "ZKAlgebra.Multilinear.mlePartialSumProduct: variable count mismatch"
+  | otherwise = lagrange [(0, g0), (1, g1), (2, g2)]
+  where
+    halfSize = V.length evalsA `div` 2
+    sumAt t =
+      sum
+        [ let a0 = evalsA V.! (2 * i)
+              a1 = evalsA V.! (2 * i + 1)
+              b0 = evalsB V.! (2 * i)
+              b1 = evalsB V.! (2 * i + 1)
+              aVal = a0 * (1 - t) + a1 * t
+              bVal = b0 * (1 - t) + b1 * t
+           in aVal * bVal
+          | i <- [0 .. halfSize - 1]
+        ]
+    g0 = sumAt 0
+    g1 = sumAt 1
+    g2 = sumAt 2
 
 -------------------------------------------------------------------------------
 -- Helpers

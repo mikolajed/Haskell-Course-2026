@@ -89,4 +89,88 @@ main = do
   let fsVerdict = sumcheckVerifyFS @97 2 claim (\pt -> mleEval f pt) fsProof
   putStrLn $ "  Verdict = " ++ show fsVerdict
 
-  putStrLn "\nTry changing Main.hs to experiment with other primes!"
+  -- Example 8: Inner Product Proof (proving something useful!)
+  putStrLn $ "\n=== Inner Product Proof ==="
+  let vecA = mlp 2 [1, 2, 3, 4] :: MultilinearPoly (Fp 97)
+  let vecB = mlp 2 [5, 6, 7, 8] :: MultilinearPoly (Fp 97)
+  -- Actual dot product: 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
+  let dotProduct = 70 :: Fp 97
+  putStrLn $ "  Vector a = [1, 2, 3, 4]"
+  putStrLn $ "  Vector b = [5, 6, 7, 8]"
+  putStrLn $ "  Claimed <a, b> = " ++ show dotProduct
+
+  -- Non-interactive proof using Fiat-Shamir
+  let ipProof = sumcheckProveFSProduct @97 vecA vecB
+  let ipOracle pt = mleEval vecA pt * mleEval vecB pt
+  let ipVerdict = sumcheckVerifyFS @97 2 dotProduct ipOracle ipProof
+  putStrLn $ "  Proof = " ++ show ipProof
+  putStrLn $ "  Verdict = " ++ show ipVerdict
+
+  -- Show that a wrong claim gets rejected
+  let wrongDot = 42 :: Fp 97
+  let wrongVerdict = sumcheckVerifyFS @97 2 wrongDot ipOracle ipProof
+  putStrLn $ "  Wrong claim <a, b> = " ++ show wrongDot ++ " -> " ++ show wrongVerdict
+
+  -- Example 9: Full ZK scenario — prover and verifier with clear roles
+  putStrLn ""
+  putStrLn "=== Zero-Knowledge Inner Product: Alice proves to Bob ==="
+  putStrLn ""
+
+  -- ── SETUP ──────────────────────────────────────────────────────────
+  -- Alice has two private vectors. She wants to prove their dot product
+  -- to Bob WITHOUT revealing the vectors themselves.
+  let aliceSecretA = mlp 3 [3, 1, 4, 1, 5, 9, 2, 6] :: MultilinearPoly (Fp 97)
+  let aliceSecretB = mlp 3 [2, 7, 1, 8, 2, 8, 1, 8] :: MultilinearPoly (Fp 97)
+  -- True inner product: 3*2 + 1*7 + 4*1 + 1*8 + 5*2 + 9*8 + 2*1 + 6*8
+  --                    =  6  +  7  +  4  +  8  + 10  + 72  +  2  + 48  = 157
+  -- 157 mod 97 = 60
+  let trueDotProduct = 60 :: Fp 97
+
+  putStrLn "  ┌─────────────────────────────────────────────────┐"
+  putStrLn "  │  ALICE (Prover) — knows the secret vectors      │"
+  putStrLn "  │    Secret a = [3, 1, 4, 1, 5, 9, 2, 6]          │"
+  putStrLn "  │    Secret b = [2, 7, 1, 8, 2, 8, 1, 8]          │"
+  putStrLn $ "  │    Claims: <a, b> = " ++ show trueDotProduct ++ "  (mod 97)                │"
+  putStrLn "  └─────────────────────────────────────────────────┘"
+  putStrLn ""
+
+  -- ── PROVER (Alice) ─────────────────────────────────────────────────
+  -- Alice generates a non-interactive proof. She uses ONLY her private
+  -- vectors. No interaction with Bob is needed.
+  let aliceProof = sumcheckProveFSProduct @97 aliceSecretA aliceSecretB
+  putStrLn "  Alice generates proof (Fiat-Shamir, no interaction needed)..."
+  putStrLn $ "    Round polynomials: " ++ show (length (proofRounds aliceProof)) ++ " rounds"
+  putStrLn $ "    Final evaluation claim: " ++ show (proofFinalEval aliceProof)
+  putStrLn ""
+
+  -- ── Alice sends to Bob: the proof + the claimed dot product ────────
+  -- She does NOT send her vectors!
+  putStrLn "  Alice sends to Bob:"
+  putStrLn "    ✓ The proof (round polynomials + final eval)"
+  putStrLn $ "    ✓ The claim: <a, b> = " ++ show trueDotProduct
+  putStrLn "    ✗ NOT the secret vectors a and b"
+  putStrLn ""
+
+  -- ── VERIFIER (Bob) ─────────────────────────────────────────────────
+  -- Bob verifies the proof. He needs oracle access to evaluate
+  -- a(r)*b(r) at a single random point r — in practice this would be
+  -- provided via a polynomial commitment scheme. Here we simulate it.
+  putStrLn "  ┌─────────────────────────────────────────────────┐"
+  putStrLn "  │  BOB (Verifier) — does NOT know the vectors     │"
+  putStrLn "  │    Has: the proof + claimed dot product         │"
+  putStrLn "  │    Has: oracle access (1 evaluation of a·b)     │"
+  putStrLn "  └─────────────────────────────────────────────────┘"
+  putStrLn ""
+
+  let bobOracle pt = mleEval aliceSecretA pt * mleEval aliceSecretB pt
+  let bobVerdict = sumcheckVerifyFS @97 3 trueDotProduct bobOracle aliceProof
+
+  putStrLn $ "  Bob's verdict: " ++ show bobVerdict
+  putStrLn ""
+
+  -- ── Bob tries a fake claim ─────────────────────────────────────────
+  let fakeClaim = 42 :: Fp 97
+  let fakeVerdict = sumcheckVerifyFS @97 3 fakeClaim bobOracle aliceProof
+  putStrLn $ "  If someone claims <a, b> = " ++ show fakeClaim ++ " with the same proof:"
+  putStrLn $ "    Bob's verdict: " ++ show fakeVerdict
+
