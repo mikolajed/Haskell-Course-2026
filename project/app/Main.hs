@@ -82,4 +82,11 @@ main = do
             ProverRound _ _ ->
               putStrLn $ "  Unexpected: more rounds?"
 
+  -- Example 7: Fiat-Shamir (non-interactive) Sumcheck
+  putStrLn $ "\nFiat-Shamir Non-Interactive Sumcheck:"
+  let fsProof = sumcheckProveFS @97 f claim
+  putStrLn $ "  Proof (no challenges needed!) = " ++ show fsProof
+  let fsVerdict = sumcheckVerifyFS @97 2 claim (\pt -> mleEval f pt) fsProof
+  putStrLn $ "  Verdict = " ++ show fsVerdict
+
   putStrLn "\nTry changing Main.hs to experiment with other primes!"
