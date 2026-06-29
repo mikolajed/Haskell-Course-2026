@@ -85,17 +85,12 @@ See the actual code in [`src/ZKAlgebra/Multilinear.hs`](./src/ZKAlgebra/Multilin
 mlePartialSumProduct :: (Field f) => MultilinearPoly f -> MultilinearPoly f -> Poly f
 mlePartialSumProduct (MLP _ evalsA) (MLP _ evalsB) = lagrange [(0, g0), (1, g1), (2, g2)]
   where
-    halfSize = V.length evalsA `div` 2
+    pairsA = activePairs evalsA
+    pairsB = activePairs evalsB
     sumAt t =
       sum
-        [ let a0 = evalsA V.! (2 * i)
-              a1 = evalsA V.! (2 * i + 1)
-              b0 = evalsB V.! (2 * i)
-              b1 = evalsB V.! (2 * i + 1)
-              aVal = a0 * (1 - t) + a1 * t
-              bVal = b0 * (1 - t) + b1 * t
-           in aVal * bVal
-          | i <- [0 .. halfSize - 1]
+        [ interpolatePair pA t * interpolatePair pB t
+        | (pA, pB) <- zip pairsA pairsB
         ]
     g0 = sumAt 0
     g1 = sumAt 1

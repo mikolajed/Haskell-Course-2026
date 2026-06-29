@@ -75,14 +75,14 @@ mleEval (MLP numVars evals) point
   | otherwise = go evals point
   where
     go values [] = V.head values
-    go values (r : rs) = go (fixFirstVariable values r) rs
+    go values (r : rs) = go (V.fromList [interpolatePair p r | p <- activePairs values]) rs
 
 -- | Fix the first variable to a field element.
 mleFix :: (Field f) => MultilinearPoly f -> f -> MultilinearPoly f
 mleFix (MLP numVars evals) r
   | numVars <= 0 =
       error "ZKAlgebra.Multilinear.mleFix: cannot fix a zero-variable polynomial"
-  | otherwise = MLP (numVars - 1) (fixFirstVariable evals r)
+  | otherwise = MLP (numVars - 1) (V.fromList [interpolatePair p r | p <- activePairs evals])
 
 -------------------------------------------------------------------------------
 -- Sums
@@ -106,8 +106,8 @@ mlePartialSum (MLP numVars evals)
       error "ZKAlgebra.Multilinear.mlePartialSum: needs at least one variable"
   | otherwise = poly [g0, g1 - g0]
   where
-    g0 = sumFirstBit 0 evals
-    g1 = sumFirstBit 1 evals
+    g0 = sum [ v0 | (v0, _) <- activePairs evals ]
+    g1 = sum [ v1 | (_, v1) <- activePairs evals ]
 
 -- | Partial sum of the product of two multilinear polynomials.
 --
@@ -128,17 +128,12 @@ mlePartialSumProduct (MLP numVarsA evalsA) (MLP numVarsB evalsB)
       error "ZKAlgebra.Multilinear.mlePartialSumProduct: variable count mismatch"
   | otherwise = lagrange [(0, g0), (1, g1), (2, g2)]
   where
-    halfSize = V.length evalsA `div` 2
+    pairsA = activePairs evalsA
+    pairsB = activePairs evalsB
     sumAt t =
       sum
-        [ let a0 = evalsA V.! (2 * i)
-              a1 = evalsA V.! (2 * i + 1)
-              b0 = evalsB V.! (2 * i)
-              b1 = evalsB V.! (2 * i + 1)
-              aVal = a0 * (1 - t) + a1 * t
-              bVal = b0 * (1 - t) + b1 * t
-           in aVal * bVal
-          | i <- [0 .. halfSize - 1]
+        [ interpolatePair pA t * interpolatePair pB t
+        | (pA, pB) <- zip pairsA pairsB
         ]
     g0 = sumAt 0
     g1 = sumAt 1
@@ -148,18 +143,18 @@ mlePartialSumProduct (MLP numVarsA evalsA) (MLP numVarsB evalsB)
 -- Helpers
 -------------------------------------------------------------------------------
 
-fixFirstVariable :: (Field f) => Vector f -> f -> Vector f
-fixFirstVariable values r =
-  V.generate newSize $ \i ->
-    let v0 = values V.! (2 * i)
-        v1 = values V.! (2 * i + 1)
-     in v0 * (1 - r) + v1 * r
-  where
-    newSize = V.length values `div` 2
+-- | Extracts the pairs of evaluations corresponding to the active variable (x1).
+-- Each pair contains the evaluation at x1=0 and x1=1 for a specific configuration
+-- of the remaining variables.
+activePairs :: Vector f -> [(f, f)]
+activePairs values =
+  [ (values V.! (2 * i), values V.! (2 * i + 1))
+  | i <- [0 .. (V.length values `div` 2) - 1]
+  ]
 
-sumFirstBit :: (Field f) => Int -> Vector f -> f
-sumFirstBit bit =
-  V.ifoldl' (\acc i value -> if i `mod` 2 == bit then acc + value else acc) 0
+-- | Linearly interpolate between two evaluations: v0 at t=0, and v1 at t=1.
+interpolatePair :: (Field f) => (f, f) -> f -> f
+interpolatePair (v0, v1) t = v0 * (1 - t) + v1 * t
 
 hypercubeSize :: Int -> Int
 hypercubeSize numVars = 2 ^ numVars
