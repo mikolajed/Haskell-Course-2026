@@ -5,6 +5,7 @@ import Test.Field (fieldTests)
 import Test.Multilinear (multilinearTests)
 import Test.NTT (nttTests)
 import Test.Polynomial (polynomialTests)
+import Test.Sumcheck (sumcheckTests)
 
 main :: IO ()
 main = defaultMain $ testGroup "ZKAlgebra"
@@ -12,4 +13,5 @@ main = defaultMain $ testGroup "ZKAlgebra"
   , multilinearTests
   , nttTests
   , polynomialTests
+  , sumcheckTests
   ]
