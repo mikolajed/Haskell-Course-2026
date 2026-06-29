@@ -46,7 +46,7 @@ newtype Transcript f = Transcript f
   deriving (Eq, Show)
 
 -- | An empty transcript initializes to 0.
-emptyTranscript :: Field f => Transcript f
+emptyTranscript :: FiniteField f => Transcript f
 emptyTranscript = Transcript 0
 
 -------------------------------------------------------------------------------
@@ -54,7 +54,7 @@ emptyTranscript = Transcript 0
 -------------------------------------------------------------------------------
 
 -- | Append field elements to the transcript by absorbing them with MiMC.
-appendToTranscript :: Field f => [f] -> State (Transcript f) ()
+appendToTranscript :: FiniteField f => [f] -> State (Transcript f) ()
 appendToTranscript vals = modify' $ \(Transcript state) ->
   let newState = foldl (\s v -> mimcHash (s + v)) state vals
    in Transcript newState
@@ -63,7 +63,7 @@ appendToTranscript vals = modify' $ \(Transcript state) ->
 --
 -- We simply hash the state one more time to get the challenge, and store
 -- that hash as the new state (acting as a domain separator for the next challenge).
-challenge :: Field f => State (Transcript f) f
+challenge :: FiniteField f => State (Transcript f) f
 challenge = do
   Transcript state <- get
   let digest = mimcHash state

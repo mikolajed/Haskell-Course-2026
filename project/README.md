@@ -27,7 +27,7 @@ When you execute `stack run`, the application steps through a series of increasi
 3. **Multilinear Polynomials**: Constructs an MLE and evaluates it over a boolean hypercube, fixing variables to compute partial sums.
 4. **Sumcheck Protocol (Interactive)**: Executes the Sumcheck protocol using a step-by-step coroutine prover and verifier.
 5. **Fiat-Shamir Non-Interactive Sumcheck**: Demonstrates the Fiat-Shamir transform, which collapses the interactive sumcheck into a static, self-contained proof object using an algebraic hashing transcript.
-6. **MiMC-5 Algebraic Hash**: Showcases our stretch goal: a ZK-friendly hash function operating purely on field elements (using $x^5$).
+6. **Dynamic MiMC Algebraic Hash**: Showcases our stretch goal: a ZK-friendly hash function operating purely on field elements that dynamically adapts its permutation exponent based on the prime field.
 7. **Inner Product Proof**: Uses Sumcheck to prove the dot product of two vectors in zero-knowledge.
 8. **Zero-Knowledge Alice vs Bob Scenario**: A grand finale showing Alice generating a Fiat-Shamir proof of a dot-product claim, sending it to Bob (without revealing her secret vectors), and Bob successfully verifying it.
 
@@ -53,7 +53,7 @@ This library successfully proves that Haskell's typeclass system and purity map 
 
 - **Multilinear Polynomials**: Fully operational $n$-variate polynomials.
 - **Interactive Sumcheck**: Features a coroutine-driven `ProverState` that interacts with a verifier to prove the sum of a multilinear polynomial over a boolean hypercube.
-- **Fiat-Shamir Transform**: Implemented in `ZKAlgebra.Crypto.FiatShamir`. **The Fiat-Shamir transcript is 100% algebraic**, absorbing field elements directly using the MiMC-5 hash function and completely avoiding traditional byte-array serialization.
+- **Fiat-Shamir Transform**: Implemented in `ZKAlgebra.Crypto.FiatShamir`. **The Fiat-Shamir transcript is 100% algebraic**, absorbing field elements directly using the dynamic MiMC hash function and completely avoiding traditional byte-array serialization.
 
 #### 3. Test Suite
 
@@ -61,7 +61,7 @@ This library successfully proves that Haskell's typeclass system and purity map 
 
 #### 4. Stretch Goal: Additional Primitives
 
-- **MiMC Algebraic Hash**: Implements the MiMC block cipher and Miyaguchi-Preneel hashing mode. Recognizing that standard MiMC-3 (using $x^3$) is insecure over $F_{97}$ because $\gcd(3, 96) \neq 1$, the implementation dynamically adapts the math to use **MiMC-5** ($x^5$).
+- **MiMC Algebraic Hash**: Implements the MiMC block cipher and Miyaguchi-Preneel hashing mode. The hash function is completely dynamic: it queries the type-level field characteristic $p$ at runtime and automatically selects the lowest secure permutation exponent $d \in \{3, 5, 7, 11\}$ such that $\gcd(d, p-1) = 1$.
 
 ---
 
