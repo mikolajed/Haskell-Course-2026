@@ -1,0 +1,57 @@
+name: Haskell CI (Project)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'project/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'project/**'
+      - '.github/workflows/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./project
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
+      with:
+        ghc-version: 'latest'
+        enable-stack: true
+        stack-version: 'latest'
+
+    - name: Cache ~/.stack
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-stack-global-${{ hashFiles('project/stack.yaml') }}-${{ hashFiles('project/package.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-stack-global-
+
+    - name: Cache .stack-work
+      uses: actions/cache@v3
+      with:
+        path: project/.stack-work
+        key: ${{ runner.os }}-stack-work-${{ hashFiles('project/stack.yaml') }}-${{ hashFiles('project/package.yaml') }}-${{ hashFiles('project/**/*.hs') }}
+        restore-keys: |
+          ${{ runner.os }}-stack-work-
+
+    - name: Install dependencies
+      run: stack build --test --only-dependencies
+
+    - name: Build
+      run: stack build
+
+    - name: Run tests
+      run: stack test
