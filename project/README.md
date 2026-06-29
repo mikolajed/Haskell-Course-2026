@@ -35,7 +35,7 @@ When you execute `stack run`, the application steps through a series of increasi
 
 ## Project Evaluation: Haskell as an Executable Specification
 
-As requested in the `description.md`, this project is fully evaluated against the core goals. Beyond simply passing tests, this project serves to answer a broader architectural question: **Can Haskell be used as a definition layer for cryptography to abstract away execution-level concerns?**
+This project serves to answer a broader architectural question: **Can Haskell be used as a definition layer for cryptography to abstract away execution-level concerns?**
 
 Zero-knowledge proof systems (like Plonk, STARKs, and Lasso) are mathematically incredibly dense. Production implementations of these protocols are almost exclusively written in systems languages like Rust or C++ (e.g., Arkworks, Halo2) to maximize performance. However, implementing complex cryptography while simultaneously battling a borrow checker, memory layouts, or SIMD intrinsics is a massive source of cognitive load—and inevitably, bugs.
 
@@ -43,25 +43,25 @@ This library successfully proves that Haskell's typeclass system and purity map 
 
 ### Extensive Evaluation of Project Components
 
-#### 1. Algebraic Library (Complete)
+#### 1. Algebraic Library
 
-- **Typeclass Hierarchy**: We implemented a robust algebraic hierarchy (`Ring`, `Field`, `FiniteField`) in `ZKAlgebra.Algebra`.
+- **Typeclass Hierarchy**: Provides a robust algebraic hierarchy (`Ring`, `Field`, `FiniteField`) in `ZKAlgebra.Algebra`.
 - **Prime-field Arithmetic**: The `Fp p` type natively handles modular arithmetic, extended Euclidean algorithm inverses, and fast exponentiation.
 - **Polynomials & NTT**: Univariate polynomials are implemented alongside $O(n \log n)$ polynomial multiplication using the Number-Theoretic Transform (NTT).
 
-#### 2. Cryptographic Primitives (Complete)
+#### 2. Cryptographic Primitives
 
 - **Multilinear Polynomials**: Fully operational $n$-variate polynomials.
-- **Interactive Sumcheck**: Implemented a coroutine-driven `ProverState` that interacts with a verifier to prove the sum of a multilinear polynomial over a boolean hypercube.
-- **Fiat-Shamir Transform**: Implemented in `ZKAlgebra.Crypto.FiatShamir`. **We exceeded the baseline requirement by refactoring the Fiat-Shamir transcript to be 100% algebraic**, absorbing field elements directly using the MiMC-5 hash function instead of serializing to bytes and using SHA-256.
+- **Interactive Sumcheck**: Features a coroutine-driven `ProverState` that interacts with a verifier to prove the sum of a multilinear polynomial over a boolean hypercube.
+- **Fiat-Shamir Transform**: Implemented in `ZKAlgebra.Crypto.FiatShamir`. **The Fiat-Shamir transcript is 100% algebraic**, absorbing field elements directly using the MiMC-5 hash function and completely avoiding traditional byte-array serialization.
 
-#### 3. Test Suite (Complete)
+#### 3. Test Suite
 
 - **112 tests** verify everything from algebraic laws (associativity, distributivity) to the **Completeness** and **Soundness** of both the Interactive and Fiat-Shamir Sumcheck protocols against adversarial provers.
 
-#### 4. Stretch Goal: Additional Primitives (Complete)
+#### 4. Stretch Goal: Additional Primitives
 
-- **MiMC Algebraic Hash**: We implemented the MiMC block cipher and Miyaguchi-Preneel hashing mode. We correctly identified that standard MiMC-3 (using $x^3$) is insecure over $F_{97}$ because $\gcd(3, 96) \neq 1$, and dynamically adapted the math to implement **MiMC-5** ($x^5$).
+- **MiMC Algebraic Hash**: Implements the MiMC block cipher and Miyaguchi-Preneel hashing mode. Recognizing that standard MiMC-3 (using $x^3$) is insecure over $F_{97}$ because $\gcd(3, 96) \neq 1$, the implementation dynamically adapts the math to use **MiMC-5** ($x^5$).
 
 ---
 
@@ -75,22 +75,34 @@ In the Sumcheck paper, the prover must compute a univariate polynomial $g_j(X_j)
 
 $$ g_j(X_j) = \sum_{x_{j+1}, \dots, x_n \in \{0,1\}} f(r_1, \dots, r_{j-1}, X_j, x_{j+1}, \dots, x_n) $$
 
-#### The Haskell Implementation (Our Codebase)
+#### The Haskell Implementation
 
-In our Haskell implementation, because we treat polynomials as immutable mathematical values with `Num` and `Fractional` instances, we can express this exact summation using a highly readable, declarative fold. 
+In our Haskell implementation, we can express this exact summation by evaluating the polynomial at $t \in \{0, 1, 2\}$ and using Lagrange interpolation. The list comprehension handles the hypercube cleanly without memory management overhead.
 
-See the actual code in [`src/ZKAlgebra/Crypto/Sumcheck.hs`](./src/ZKAlgebra/Crypto/Sumcheck.hs):
+See the actual code in [`src/ZKAlgebra/Multilinear.hs`](./src/ZKAlgebra/Multilinear.hs):
 
 ```haskell
--- Computes the polynomial for the current round by summing over the boolean hypercube
 mlePartialSumProduct :: (Field f) => MultilinearPoly f -> MultilinearPoly f -> Poly f
-mlePartialSumProduct a b =
-  sum [ evalAtBooleanHypercube pt a * evalAtBooleanHypercube pt b
-      | pt <- booleanHypercube (mlpNumVars a - 1)
-      ]
+mlePartialSumProduct (MLP _ evalsA) (MLP _ evalsB) = lagrange [(0, g0), (1, g1), (2, g2)]
+  where
+    halfSize = V.length evalsA `div` 2
+    sumAt t =
+      sum
+        [ let a0 = evalsA V.! (2 * i)
+              a1 = evalsA V.! (2 * i + 1)
+              b0 = evalsB V.! (2 * i)
+              b1 = evalsB V.! (2 * i + 1)
+              aVal = a0 * (1 - t) + a1 * t
+              bVal = b0 * (1 - t) + b1 * t
+           in aVal * bVal
+          | i <- [0 .. halfSize - 1]
+        ]
+    g0 = sumAt 0
+    g1 = sumAt 1
+    g2 = sumAt 2
 ```
 
-The cognitive load is zero. The code is a literal 1:1 translation of the mathematical sigma $\sum$. Because Haskell is lazy and pure, we do not worry about memory allocation for the intermediate polynomials generated during the sum. The list comprehension mathematically defines the boolean hypercube perfectly.
+The cognitive load is incredibly low. The code is a pure translation of the mathematical sigma $\sum$ combined with the linear interpolation formula $(1-t)x_0 + t x_1$. Because Haskell is lazy and pure, we do not worry about memory allocation for intermediate polynomials. The list comprehension maps over the boolean hypercube without any mutable state.
 
 #### The Rust Contrast (Actual Arkworks Implementation)
 
@@ -147,25 +159,30 @@ Another prime example is the Fiat-Shamir heuristic, which requires maintaining a
 In the academic papers, Fiat-Shamir is described as a simple recurrence:
 $$ r_j = \text{Hash}( \text{Transcript}_{j-1} \ || \ g_j ) $$
 
-#### The Haskell Implementation (Our Codebase)
+#### The Haskell Implementation
 
 In our Haskell project, we used the `State` monad to perfectly encapsulate this without ever exposing mutable state to the protocol logic. 
 
 See the actual Fiat-Shamir execution in [`src/ZKAlgebra/Crypto/FiatShamir.hs`](./src/ZKAlgebra/Crypto/FiatShamir.hs):
 
 ```haskell
--- Drives the prover non-interactively using the State monad transcript
-driveProverFS :: forall p. (KnownNat p) => ProverState (Fp p) -> SumcheckProof (Fp p)
-driveProverFS prover = evalState (go prover []) emptyTranscript
+-- | Internal helper: drive any 'ProverState' to completion using Fiat-Shamir.
+driveProverFS ::
+  forall p.
+  (KnownNat p) =>
+  ProverState (Fp p) ->
+  SumcheckProof (Fp p)
+driveProverFS prover =
+  evalState (go prover []) emptyTranscript
   where
+    go :: ProverState (Fp p) -> [RoundMessage (Fp p)] -> State (Transcript (Fp p)) (SumcheckProof (Fp p))
+    go (ProverDone v) acc = return $ SumcheckProof (reverse acc) v
     go (ProverRound msg k) acc = do
-      -- Absorb the round polynomial coefficients directly into the transcript algebraically
+      -- Append the round polynomial coefficients directly to the transcript!
       appendToTranscript (polyCoeffs (roundPoly msg))
-      
       -- Derive the challenge algebraically from the transcript
       r <- challenge
-      
-      -- Continue with the next round (purely applying the continuation 'k')
+      -- Continue with the next round
       go (k r) (msg : acc)
 ```
 The state is threaded invisibly. There are no mutable references. `appendToTranscript` and `challenge` are just stateful actions that the compiler evaluates purely.
