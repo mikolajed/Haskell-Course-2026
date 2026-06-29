@@ -13,10 +13,9 @@ library
                      , ZKAlgebra.Polynomial
                      , ZKAlgebra.Crypto.Sumcheck
                      , ZKAlgebra.Crypto.FiatShamir
+                     , ZKAlgebra.Crypto.MiMC
   build-depends:       base >= 4.7 && < 5
                      , vector
-                     , bytestring
-                     , cryptohash-sha256
                      , mtl
   default-language:    Haskell2010
 
@@ -37,6 +36,7 @@ test-suite zk-algebra-test
                      , Test.Polynomial
                      , Test.Sumcheck
                      , Test.FiatShamir
+                     , Test.MiMC
   build-depends:       base >= 4.7 && < 5
                      , project
                      , tasty

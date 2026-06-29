@@ -10,9 +10,9 @@
 -- Turns the interactive sumcheck protocol into a non-interactive one by
 -- deriving verifier challenges from a hash of the transcript so far.
 --
--- The prover and verifier build identical transcripts, so the verifier can
--- independently re-derive every challenge and check the proof without
--- interaction.
+-- This module uses the ZK-friendly MiMC-5 algebraic hash function, allowing
+-- the transcript to operate entirely on field elements without any bitwise
+-- serialization.
 module ZKAlgebra.Crypto.FiatShamir
   ( -- * Transcript
     Transcript (..),
@@ -22,10 +22,6 @@ module ZKAlgebra.Crypto.FiatShamir
     appendToTranscript,
     challenge,
 
-    -- * Encoding
-    encodeFp,
-    encodePoly,
-
     -- * Non-interactive sumcheck
     sumcheckProveFS,
     sumcheckProveFSProduct,
@@ -34,11 +30,8 @@ module ZKAlgebra.Crypto.FiatShamir
 where
 
 import Control.Monad.State.Strict (State, get, modify', evalState, runState)
-import qualified Crypto.Hash.SHA256 as SHA256
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import Data.Word (Word8)
 import GHC.TypeNats (KnownNat)
+import ZKAlgebra.Crypto.MiMC (mimcHash)
 import ZKAlgebra.Crypto.Sumcheck
 import ZKAlgebra.Field
 import ZKAlgebra.Multilinear
@@ -48,66 +41,41 @@ import ZKAlgebra.Polynomial
 -- Transcript
 -------------------------------------------------------------------------------
 
--- | An append-only transcript of all protocol messages exchanged so far.
--- Used as the hash input for deriving challenges.
-newtype Transcript = Transcript ByteString
+-- | An append-only transcript represented purely as a running field element state.
+newtype Transcript f = Transcript f
   deriving (Eq, Show)
 
--- | An empty transcript to start a protocol run.
-emptyTranscript :: Transcript
-emptyTranscript = Transcript BS.empty
+-- | An empty transcript initializes to 0.
+emptyTranscript :: Field f => Transcript f
+emptyTranscript = Transcript 0
 
 -------------------------------------------------------------------------------
 -- Transcript operations (State monad)
 -------------------------------------------------------------------------------
 
--- | Append raw bytes to the transcript.
-appendToTranscript :: ByteString -> State Transcript ()
-appendToTranscript bs = modify' $ \(Transcript t) -> Transcript (t <> bs)
+-- | Append field elements to the transcript by absorbing them with MiMC.
+appendToTranscript :: Field f => [f] -> State (Transcript f) ()
+appendToTranscript vals = modify' $ \(Transcript state) ->
+  let newState = foldl (\s v -> mimcHash (s + v)) state vals
+   in Transcript newState
 
 -- | Derive a challenge field element from the current transcript state.
 --
--- Hashes the transcript with SHA-256, interprets the first 8 bytes as a
--- big-endian unsigned integer, and reduces modulo @p@. The hash digest is
--- then appended to the transcript as a domain separator so that subsequent
--- calls to 'challenge' produce different values.
-challenge :: forall p. (KnownNat p) => State Transcript (Fp p)
+-- We simply hash the state one more time to get the challenge, and store
+-- that hash as the new state (acting as a domain separator for the next challenge).
+challenge :: Field f => State (Transcript f) f
 challenge = do
-  Transcript t <- get
-  let digest = SHA256.hash t
-      -- Take first 8 bytes and interpret as big-endian Integer
-      value = bytesToInteger (BS.take 8 digest)
-      result = mkFp value
-  -- Append the full digest as a domain separator
-  appendToTranscript digest
-  return result
-
--------------------------------------------------------------------------------
--- Encoding
--------------------------------------------------------------------------------
-
--- | Encode a prime field element as a ByteString.
--- Uses a simple variable-length big-endian encoding of the underlying integer.
-encodeFp :: Fp p -> ByteString
-encodeFp fp = integerToBytes (unFp fp)
-
--- | Encode a polynomial as a ByteString by encoding its degree followed by
--- each coefficient.
-encodePoly :: Poly (Fp p) -> ByteString
-encodePoly p =
-  let coeffs = polyCoeffs p
-      encodedDeg = integerToBytes (fromIntegral (length coeffs))
-      encodedCoeffs = map encodeFp coeffs
-   in BS.concat (encodedDeg : encodedCoeffs)
+  Transcript state <- get
+  let digest = mimcHash state
+  -- The digest itself becomes the new transcript state
+  modify' $ const (Transcript digest)
+  return digest
 
 -------------------------------------------------------------------------------
 -- Non-interactive sumcheck
 -------------------------------------------------------------------------------
 
 -- | Non-interactive sumcheck prover using the Fiat-Shamir heuristic.
---
--- Drives the coroutine-based 'sumcheckProver' by deriving each challenge
--- from the transcript.
 sumcheckProveFS ::
   forall p.
   (KnownNat p) =>
@@ -118,8 +86,6 @@ sumcheckProveFS poly _claimedSum =
   driveProverFS @p (sumcheckProver poly)
 
 -- | Non-interactive sumcheck prover for the product of two MLEs.
---
--- Proves that @\sum_{x \in \{0,1\}^n} a(x) \cdot b(x) = H@ without interaction.
 sumcheckProveFSProduct ::
   forall p.
   (KnownNat p) =>
@@ -138,20 +104,17 @@ driveProverFS ::
 driveProverFS prover =
   evalState (go prover []) emptyTranscript
   where
-    go :: ProverState (Fp p) -> [RoundMessage (Fp p)] -> State Transcript (SumcheckProof (Fp p))
+    go :: ProverState (Fp p) -> [RoundMessage (Fp p)] -> State (Transcript (Fp p)) (SumcheckProof (Fp p))
     go (ProverDone v) acc = return $ SumcheckProof (reverse acc) v
     go (ProverRound msg k) acc = do
-      -- Append the round polynomial to the transcript
-      appendToTranscript (encodePoly (roundPoly msg))
-      -- Derive the challenge from the transcript
-      r <- challenge @p
+      -- Append the round polynomial coefficients directly to the transcript!
+      appendToTranscript (polyCoeffs (roundPoly msg))
+      -- Derive the challenge algebraically from the transcript
+      r <- challenge
       -- Continue with the next round
       go (k r) (msg : acc)
 
 -- | Non-interactive sumcheck verifier using the Fiat-Shamir heuristic.
---
--- Re-derives the challenges from the proof transcript and checks each round,
--- then verifies the final evaluation against the oracle.
 sumcheckVerifyFS ::
   forall p.
   (KnownNat p) =>
@@ -170,7 +133,7 @@ sumcheckVerifyFS numVars claimedSum oracle proof
       Fp p ->
       [RoundMessage (Fp p)] ->
       [Fp p] ->
-      State Transcript Verdict
+      State (Transcript (Fp p)) Verdict
     go expectedSum [] challengesAcc =
       if expectedSum == proofFinalEval proof
         then
@@ -192,25 +155,8 @@ sumcheckVerifyFS numVars claimedSum oracle proof
                 ++ " but got "
                 ++ show g_sum
         else do
-          -- Append the same polynomial the prover appended
-          appendToTranscript (encodePoly g_i)
+          -- Append the same polynomial coefficients the prover appended
+          appendToTranscript (polyCoeffs g_i)
           -- Re-derive the same challenge
-          r <- challenge @p
+          r <- challenge
           go (polyEval g_i r) rounds (r : challengesAcc)
-
--------------------------------------------------------------------------------
--- Helpers
--------------------------------------------------------------------------------
-
--- | Convert up to 8 bytes (big-endian) to a non-negative Integer.
-bytesToInteger :: ByteString -> Integer
-bytesToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
-
--- | Convert a non-negative Integer to a ByteString (big-endian, minimum bytes).
--- Zero is encoded as a single 0x00 byte.
-integerToBytes :: Integer -> ByteString
-integerToBytes 0 = BS.singleton 0
-integerToBytes n = BS.pack (go n [])
-  where
-    go 0 acc = acc
-    go x acc = go (x `div` 256) (fromIntegral (x `mod` 256) : acc)

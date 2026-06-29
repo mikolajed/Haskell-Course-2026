@@ -7,6 +7,7 @@ import Test.NTT (nttTests)
 import Test.Polynomial (polynomialTests)
 import Test.Sumcheck (sumcheckTests)
 import Test.FiatShamir (fiatShamirTests)
+import Test.MiMC (mimcTests)
 
 main :: IO ()
 main = defaultMain $ testGroup "ZKAlgebra"
@@ -16,4 +17,5 @@ main = defaultMain $ testGroup "ZKAlgebra"
   , polynomialTests
   , sumcheckTests
   , fiatShamirTests
+  , mimcTests
   ]

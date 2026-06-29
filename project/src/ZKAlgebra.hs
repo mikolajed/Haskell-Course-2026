@@ -16,6 +16,7 @@ module ZKAlgebra
     module ZKAlgebra.Polynomial,
     module ZKAlgebra.Crypto.Sumcheck,
     module ZKAlgebra.Crypto.FiatShamir,
+    module ZKAlgebra.Crypto.MiMC,
   )
 where
 
@@ -26,3 +27,4 @@ import ZKAlgebra.NTT
 import ZKAlgebra.Polynomial
 import ZKAlgebra.Crypto.Sumcheck
 import ZKAlgebra.Crypto.FiatShamir
+import ZKAlgebra.Crypto.MiMC

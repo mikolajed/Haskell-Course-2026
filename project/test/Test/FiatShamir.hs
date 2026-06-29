@@ -103,10 +103,7 @@ unitTests =
             interactiveProof = sumcheckProveInteractive f claim [2, 3]
          in assertBool
               "FS proof should differ from interactive proof with [2,3] challenges"
-              (fsProof /= interactiveProof),
-      testCase "encoding round-trip: encodeFp produces non-empty ByteString" $
-        let x = 42 :: F
-         in assertBool "encodeFp should not be empty" (not (null (show (encodeFp x))))
+              (fsProof /= interactiveProof)
     ]
 
 innerProductFSTests :: TestTree

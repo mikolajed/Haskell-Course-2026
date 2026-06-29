@@ -4,6 +4,9 @@
 module Main (main) where
 
 import ZKAlgebra
+import ZKAlgebra.Crypto.FiatShamir
+import ZKAlgebra.Crypto.Sumcheck
+import ZKAlgebra.Crypto.MiMC
 
 main :: IO ()
 main = do
@@ -89,7 +92,26 @@ main = do
   let fsVerdict = sumcheckVerifyFS @97 2 claim (\pt -> mleEval f pt) fsProof
   putStrLn $ "  Verdict = " ++ show fsVerdict
 
-  -- Example 8: Inner Product Proof (proving something useful!)
+  -- Example 8: MiMC Algebraic Hash
+  putStrLn ""
+  putStrLn "=== MiMC-5 Algebraic Hash Function ==="
+  putStrLn ""
+  putStrLn "  MiMC is a ZK-friendly hash function operating directly on field elements."
+  putStrLn "  Hashing takes 110 rounds of x -> (x + k + c)^5."
+  
+  let secretValue = 123 :: Fp 251
+  let mimcOutput = mimcHash secretValue
+  putStrLn $ "  Input (secret): " ++ show secretValue
+  putStrLn $ "  MiMC-5 Hash   : " ++ show mimcOutput
+  
+  putStrLn "  ┌─────────────────────────────────────────────────┐"
+  putStrLn "  │  Why use MiMC instead of SHA-256?               │"
+  putStrLn "  │  Proving this hash in a ZK-SNARK requires:      │"
+  putStrLn "  │    - SHA-256: ~30,000 polynomial constraints    │"
+  putStrLn "  │    - MiMC-5 : ~330 polynomial constraints       │"
+  putStrLn "  └─────────────────────────────────────────────────┘"
+
+  -- Example 9: Inner Product Proof (proving something useful!)
   putStrLn $ "\n=== Inner Product Proof ==="
   let vecA = mlp 2 [1, 2, 3, 4] :: MultilinearPoly (Fp 97)
   let vecB = mlp 2 [5, 6, 7, 8] :: MultilinearPoly (Fp 97)
@@ -111,7 +133,7 @@ main = do
   let wrongVerdict = sumcheckVerifyFS @97 2 wrongDot ipOracle ipProof
   putStrLn $ "  Wrong claim <a, b> = " ++ show wrongDot ++ " -> " ++ show wrongVerdict
 
-  -- Example 9: Full ZK scenario — prover and verifier with clear roles
+  -- Example 10: Full ZK scenario — prover and verifier with clear roles
   putStrLn ""
   putStrLn "=== Zero-Knowledge Inner Product: Alice proves to Bob ==="
   putStrLn ""
